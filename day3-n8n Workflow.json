@@ -1,0 +1,252 @@
+{
+  "name": "HR Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {}
+          ]
+        },
+        "filters": {
+          "q": "Leave"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "106c6125-465d-4f3e-9494-7cfe5fde0227",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "o28l8Y4H8Qkk8v7m",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Add a new field called 'myNewField' to the JSON of the item\n$input.item.json.myNewField = 1;\n\nreturn $input.item;\nconst emailBody = item.json.body;\nconst regex = /from\\s(\\d{4}-\\d{2}-\\d{2})\\sto\\s(\\d{4}-\\d{2}-\\d{2})/i;\nconst leaveTypeRegex = /leave\\s+type\\s*:\\s*(\\w+)/i;\nconst match = emailBody.match(regex);\nconst leaveTypeMatch = emailBody.match(leaveTypeRegex);\n\nreturn [\n  {\n    json: {\n      startDate: match ? match[1] : null,\n      endDate: match ? match[2] : null,\n      leaveType: leaveTypeMatch ? leaveTypeMatch[1] : 'Casual',\n      email: item.json.from.email\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "70a04de9-18ba-4b8d-898e-235ccf9e3250",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "=1NL-LfDms3ScHlbNvQMB4lRcPFLgM1AnIYR_9iIbELJk",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1NL-LfDms3ScHlbNvQMB4lRcPFLgM1AnIYR_9iIbELJk/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        440,
+        0
+      ],
+      "id": "5708655a-6683-4d7f-a56f-71aebf1fa645",
+      "name": "Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dMHjVAdKHxBO8n96",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an HR Manager with extensive experience in handling employee leave requests and crafting professional correspondence.\n\nYour task is to generate **formal email responses** based on the provided employee leave dataset.  \nFor each employee:\n\n- If their Total Available Leave is greater than 0, generate a **Leave Approval Email**.  \n- If their Total Available Leave is 0, generate a **Leave Rejection Email**.\n\nEach email must be structured using the following clear format:\n\n---\n**Employee ID: <ID> (<Employee Name>)**  \n**Email ID: <employee@example.com>**  \n**Subject: <Leave Request Approval or Rejection>**\n\n<Email message body in professional tone, line breaks included>\n\n---\n\nPlease follow this structure **exactly** for each employee so it can be parsed programmatically.  \nHere is the dataset you will use:  \n`{{ $json.markdown }}`\n\nNow, generate the emails for each employee based on their leave balances.\n\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        900,
+        0
+      ],
+      "id": "5ef9ad8b-8184-4979-b595-625fb1ac2c93",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        220
+      ],
+      "id": "e75f247b-a765-49c9-a625-16a8363f860f",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "L0a6CEIpjyAnXLN0",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1800,
+        0
+      ],
+      "id": "6b4be723-9102-4fa5-b5dd-3446cedd7de7",
+      "name": "Gmail",
+      "webhookId": "8016f313-e5bf-4d77-9e83-cfaea0023a0b",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "o28l8Y4H8Qkk8v7m",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map((item) => item.json);\n\nconst markdown = items\n  .map((item) => {\n    let md = \"\";\n    for (const key in item) {\n      md += `**${key}**: ${item[key]}\\n`;\n    }\n    return md;\n  })\n  .join(\"\\n\");\n\nreturn { markdown };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "id": "847bdd0a-1085-43a6-9f00-1436e0865289",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawOutput = $json.output;\n\n// Clean and normalize newlines\nconst cleanedOutput = rawOutput.replace(/\\\\n/g, '\\n').trim();\n\n// Split by each employee block\nconst entries = cleanedOutput.split(/\\*\\*Employee ID: \\d+ \\([^)]+\\)\\*\\*/).slice(1);\n\n// Also extract the matching headers so we can parse names and IDs\nconst headers = [...cleanedOutput.matchAll(/\\*\\*Employee ID: (\\d+) \\(([^)]+)\\)\\*\\*/g)];\n\nconst results = entries.map((entry, index) => {\n  const id = headers[index][1];\n  const name = headers[index][2];\n\n  // Extract Email\n  const emailMatch = entry.match(/\\*\\*Email ID: (.+?)\\*\\*/);\n  const to = emailMatch ? emailMatch[1].trim() : '';\n\n  // Extract Subject\n  const subjectMatch = entry.match(/\\*\\*Subject: (.+?)\\*\\*/);\n  const subject = subjectMatch ? subjectMatch[1].trim() : '';\n\n  // Extract message (everything after subject)\n  const messageStartIndex = entry.indexOf('**Subject:');\n  const messageContent = entry.substring(messageStartIndex)\n    .replace(/\\*\\*/g, '')  // remove markdown asterisks\n    .split('\\n')\n    .slice(1)              // skip subject line\n    .join('\\n')\n    .trim();\n\n  return {\n    id,\n    name,\n    to,\n    subject,\n    message: messageContent\n  };\n});\n\n// Return for downstream Email node\nreturn results.map(email => ({ json: email }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        0
+      ],
+      "id": "74d0aa1d-5e6e-4e84-bdb6-48b3f2e3fcf6",
+      "name": "Code2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code2": {
+      "main": [
+        [
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "83b937a4-9ada-4ea1-bec5-add6238bf347",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4f08f5c3f577c2ffd5b87c90fc6c35a8caa5649bf37afe4c5c24bbfcbb439792"
+  },
+  "id": "Kz7rP8knn9Ai12Sy",
+  "tags": []
+}
